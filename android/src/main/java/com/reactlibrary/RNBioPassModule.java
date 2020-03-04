@@ -200,7 +200,7 @@ public class RNBioPassModule extends ReactContextBaseJavaModule {
       dialog.authenticate(fingerprintManager, new FingerprintManager.CryptoObject(cipher), new RNBioPassDialog.AuthenticateCallback() {
         @Override
         public void reject(Throwable e) {
-          promise.reject("Unable to register for quick balance");
+          promise.reject("Unable to register biopass");
         }
         @Override
         public void resolve() {
