@@ -64,6 +64,7 @@ import android.support.design.widget.BottomSheetDialog;
 
 import android.hardware.fingerprint.FingerprintManager;
 
+
 class PromiseRejection extends Exception {
   private String code;
 
@@ -85,6 +86,9 @@ public class RNBioPassModule extends ReactContextBaseJavaModule {
   private static final String ENCRYPTION_ALGORITHM = KeyProperties.KEY_ALGORITHM_RSA;
   private static final String ENCRYPTION_BLOCK_MODE = KeyProperties.BLOCK_MODE_ECB;
   private static final String ENCRYPTION_PADDING = KeyProperties.ENCRYPTION_PADDING_RSA_PKCS1;
+
+  private static final String Tag = "bio";
+  
 
   private final ReactApplicationContext reactContext;
 
@@ -158,12 +162,94 @@ public class RNBioPassModule extends ReactContextBaseJavaModule {
   }
 
   @ReactMethod
+  public void callFingerPrint(String promptText, final Promise promise){
+    
+    try {
+
+      try {
+      KeyStore keyStore = getKeyStoreAndLoad();
+
+      boolean contains;
+      try {
+        contains = keyStore.containsAlias(DEFAULT_SERVICE);
+      } catch (KeyStoreException e) {
+        throw new PromiseRejection("RUNTIME_ERROR", "Failed to find key", e);
+      }
+
+      if (!contains) {
+        AlgorithmParameterSpec spec;
+        spec = new KeyGenParameterSpec.Builder(
+          DEFAULT_SERVICE,
+          KeyProperties.PURPOSE_DECRYPT | KeyProperties.PURPOSE_ENCRYPT)
+          .setBlockModes(ENCRYPTION_BLOCK_MODE)
+          .setEncryptionPaddings(ENCRYPTION_PADDING)
+          .setRandomizedEncryptionRequired(true)
+          .setUserAuthenticationRequired(true)
+          .build();
+
+        KeyPairGenerator generator;
+        try {
+          generator = KeyPairGenerator.getInstance(ENCRYPTION_ALGORITHM, KEYSTORE_TYPE);
+        } catch (NoSuchAlgorithmException e) {
+          throw new PromiseRejection("NOT_SUPPORTED", "Algorithm not supported", e);
+        } catch (NoSuchProviderException e) {
+          throw new PromiseRejection("NOT_SUPPORTED", "Failed to find Android key store", e);
+        }
+
+        try {
+          generator.initialize(spec);
+        } catch (InvalidAlgorithmParameterException e) {
+          throw new PromiseRejection("NO_FINGERPRINT", "No fingerprint enrolled on device", e);
+        }
+
+        generator.generateKeyPair();
+      }
+
+      Key key = getPublicKeyFromKeyStore(keyStore);
+    } catch (PromiseRejection e) {
+      promise.reject(e.getCode(), e.getMessage(), e.getCause());
+    }
+
+
+      FingerprintManager fingerprintManager = (FingerprintManager) this.reactContext.getSystemService(Context.FINGERPRINT_SERVICE);
+
+      final KeyStore keyStore = getKeyStoreAndLoad();
+      final Key key = getPrivateKeyFromKeyStore(keyStore);
+      final Cipher cipher = createCipher();
+
+      try {
+        cipher.init(Cipher.DECRYPT_MODE, key);
+      } catch (InvalidKeyException e) {
+        throw new PromiseRejection("RUNTIME_ERROR", "Invalid key", e);
+      }
+
+      RNBioPassDialog dialog = new RNBioPassDialog(this.reactContext, promptText);
+      dialog.authenticate(fingerprintManager, new FingerprintManager.CryptoObject(cipher), new RNBioPassDialog.AuthenticateCallback() {
+        @Override
+        public void reject(Throwable e) {
+          promise.reject(e.toString());
+        }
+        @Override
+        public void resolve() {
+          try {
+            promise.resolve(null);
+          } catch (Exception e) {
+            promise.reject("Fingerprint has error");
+          }
+        }
+      });
+    }catch (Exception e) {
+      promise.reject("Fingerprint has error");
+    }
+  }
+
+  @ReactMethod
   public void retreive(String promptText, final Promise promise) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
       promise.reject("NOT_SUPPORTED", "BioPass is not supported on this version of Android");
       return;
     }
-
+   
     try {
       FingerprintManager fingerprintManager = (FingerprintManager) this.reactContext.getSystemService(Context.FINGERPRINT_SERVICE);
 
@@ -200,7 +286,7 @@ public class RNBioPassModule extends ReactContextBaseJavaModule {
       dialog.authenticate(fingerprintManager, new FingerprintManager.CryptoObject(cipher), new RNBioPassDialog.AuthenticateCallback() {
         @Override
         public void reject(Throwable e) {
-          promise.reject("Unable to register biopass");
+          promise.reject(e.toString());
         }
         @Override
         public void resolve() {
