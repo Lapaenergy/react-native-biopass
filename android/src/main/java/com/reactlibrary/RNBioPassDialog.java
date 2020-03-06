@@ -31,6 +31,7 @@ import android.support.design.widget.BottomSheetDialog;
 
 import android.hardware.fingerprint.FingerprintManager;
 
+
 public class RNBioPassDialog extends BottomSheetDialog {
   static public class AuthenticateCallback {
     public void reject(Throwable e) {}
@@ -141,9 +142,13 @@ public class RNBioPassDialog extends BottomSheetDialog {
 
     cancellationSignal = new CancellationSignal();
 
+    dialog.setCanceledOnTouchOutside(true);
+
     dialog.setOnCancelListener(new DialogInterface.OnCancelListener() {
+
       @Override
       public void onCancel(DialogInterface dialog) {
+        cancellationSignal.cancel();
         icon.post(new Runnable() {
           public void run () {
             cancellationSignal.cancel();
@@ -158,9 +163,11 @@ public class RNBioPassDialog extends BottomSheetDialog {
     fingerprintManager.authenticate(cryptoObject, cancellationSignal, 0, new FingerprintManager.AuthenticationCallback() {
       @Override
       public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult result) {
+
         icon.post(new Runnable() {
           public void run () {
             dialog.hide();
+            cancellationSignal.cancel();
             callback.resolve();
           }
         });
@@ -171,6 +178,7 @@ public class RNBioPassDialog extends BottomSheetDialog {
         icon.post(new Runnable() {
           public void run () {
             dialog.hide();
+            cancellationSignal.cancel();
             callback.reject(new Exception(errString.toString()));
           }
         });
