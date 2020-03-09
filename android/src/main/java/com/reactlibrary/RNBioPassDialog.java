@@ -149,11 +149,11 @@ public class RNBioPassDialog extends BottomSheetDialog {
       @Override
       public void onCancel(DialogInterface dialog) {
         cancellationSignal.cancel();
+        callback.reject(new Exception("User cancelled dialog"));
         icon.post(new Runnable() {
           public void run () {
             cancellationSignal.cancel();
             cancellationSignal = null;
-
             callback.reject(new Exception("User cancelled dialog"));
           }
         });
