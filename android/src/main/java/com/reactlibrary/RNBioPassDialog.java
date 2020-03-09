@@ -31,6 +31,24 @@ import android.support.design.widget.BottomSheetDialog;
 
 import android.hardware.fingerprint.FingerprintManager;
 
+// class PromiseReject extends Exception {
+//   private String code;
+//   private String message;
+
+//   public PromiseReject(String code, String message) {
+//     super(message, new Exception(""));
+//     this.code = code;
+//     this.message = message;
+//   }
+
+//   public String getCode() {
+//     return this.code;
+//   }
+
+//   public String getMessage() {
+//     return this.message;
+//   }
+// }
 
 public class RNBioPassDialog extends BottomSheetDialog {
   static public class AuthenticateCallback {
@@ -120,7 +138,7 @@ public class RNBioPassDialog extends BottomSheetDialog {
       icon.setImageResource(R.drawable.fingerprint);
       icon.setLayoutParams(layout);
 
-      ImageViewCompat.setImageTintList(icon, themeAttributeToColorStateList(android.R.attr.colorAccent, context, android.R.color.black));
+      // ImageViewCompat.setImageTintList(icon, themeAttributeToColorStateList(android.R.attr.colorAccent, context, android.R.color.black));
     }
 
     {
@@ -149,12 +167,12 @@ public class RNBioPassDialog extends BottomSheetDialog {
       @Override
       public void onCancel(DialogInterface dialog) {
         cancellationSignal.cancel();
-        callback.reject(new Exception("User cancelled dialog"));
+        callback.reject(new Exception("You did not authenticate successfully. Canceled by User"));
         icon.post(new Runnable() {
           public void run () {
             cancellationSignal.cancel();
             cancellationSignal = null;
-            callback.reject(new Exception("User cancelled dialog"));
+            callback.reject(new Exception("You did not authenticate successfully. Canceled by User"));
           }
         });
       }
@@ -163,12 +181,21 @@ public class RNBioPassDialog extends BottomSheetDialog {
     fingerprintManager.authenticate(cryptoObject, cancellationSignal, 0, new FingerprintManager.AuthenticationCallback() {
       @Override
       public void onAuthenticationSucceeded(FingerprintManager.AuthenticationResult result) {
-
+        icon.setImageResource(R.drawable.fingerprint_green);
         icon.post(new Runnable() {
           public void run () {
-            dialog.hide();
             cancellationSignal.cancel();
+            dialog.hide();
             callback.resolve();
+          }
+        });
+      }
+
+      @Override
+      public void onAuthenticationFailed() {
+        icon.post(new Runnable() {
+          public void run () {
+            icon.setImageResource(R.drawable.fingerprint_red);
           }
         });
       }
@@ -177,9 +204,10 @@ public class RNBioPassDialog extends BottomSheetDialog {
       public void onAuthenticationError(final int errorCode, final CharSequence errString) {
         icon.post(new Runnable() {
           public void run () {
+            icon.setImageResource(R.drawable.fingerprint_red);
             dialog.hide();
             cancellationSignal.cancel();
-            callback.reject(new Exception(errString.toString()));
+            callback.reject(new Exception("Too many attempts. Try again later"));
           }
         });
       }
